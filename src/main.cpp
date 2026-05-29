@@ -14,7 +14,6 @@
 #include <cstring>
 #include <SDL3/SDL.h>
 #include "shader.hpp"
-#include "world.cpp"
 
 #include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
 #include "Graphics/GraphicsEngine/interface/SwapChain.h"
@@ -134,54 +133,40 @@ private:
 
     void CreatePipelines()
     {
-        GraphicsPipelineStateCreateInfo PSOCreateInfo;
-        PSOCreateInfo.PSODesc.Name         = "Simple triangle PSO";
-        PSOCreateInfo.PSODesc.PipelineType = PIPELINE_TYPE_GRAPHICS;
-
-        PSOCreateInfo.GraphicsPipeline.NumRenderTargets  = 1;
-        PSOCreateInfo.GraphicsPipeline.RTVFormats[0]     = m_pSwapChain->GetDesc().ColorBufferFormat;
-        PSOCreateInfo.GraphicsPipeline.DSVFormat         = TEX_FORMAT_D32_FLOAT;
-        PSOCreateInfo.GraphicsPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_NONE;
-        PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = False;
-
-        ShaderManager shaderManager(m_pDevice, "shaders/main.vert", "shaders/main.frag");
-
-        PSOCreateInfo.pVS = shaderManager.getVertexShader();
-        PSOCreateInfo.pPS = shaderManager.getFragmentShader();
-
-        m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pPSO);
+        m_pPipeline = std::make_unique<ShaderManager>(
+            m_pDevice,
+            "shaders/main.vert", "shaders/main.frag",
+            m_pSwapChain->GetDesc().ColorBufferFormat,
+            m_pSwapChain->GetDesc().DepthBufferFormat
+        );
     }
 
     void Render()
     {
         auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
         auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
+
         m_pImmediateContext->SetRenderTargets(1, &pRTV, pDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-        const float ClearColor[] = {0.35f, 0.35f, 0.35f, 1.0f};
+        const float ClearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
         m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         m_pImmediateContext->ClearDepthStencil(pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-        m_pImmediateContext->SetPipelineState(m_pPSO);
-
-        DrawAttribs drawAttrs;
-        drawAttrs.NumVertices = 6;
-        m_pImmediateContext->Draw(drawAttrs);
+        m_pPipeline->draw(m_pImmediateContext);
 
         m_pSwapChain->Present();
     }
 
-private:
     uint16_t m_Width;
     uint16_t m_Height;
 
     SDL_Window* window = nullptr;
 
+    std::unique_ptr<ShaderManager> m_pPipeline;
+
     RefCntAutoPtr<IRenderDevice>  m_pDevice;
     RefCntAutoPtr<IDeviceContext> m_pImmediateContext;
     RefCntAutoPtr<ISwapChain>     m_pSwapChain;
-    RefCntAutoPtr<IPipelineState> m_pPSO;
 };
 
 int main(int argc, char** argv)

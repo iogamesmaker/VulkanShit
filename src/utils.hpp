@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <limits.h>
 #endif
+#include <fstream>
 
 inline std::filesystem::path root_dir() {
 #if defined (_WIN32)
@@ -20,4 +21,14 @@ inline std::filesystem::path root_dir() {
 #else
     return std::filesystem::current_path()
 #endif
+}
+
+std::string readFile(const std::string& path) {
+    std::ifstream file(path);
+    if(!file.is_open()) {
+        throw std::runtime_error("couldn't open file " + path);
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }

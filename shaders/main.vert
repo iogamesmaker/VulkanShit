@@ -1,19 +1,13 @@
-struct VSOutput {
-    float4 Pos   : SV_POSITION;
-    float2 UV    : TEXCOORD0;
+struct VSOutput
+{
+    float4 pos : SV_Position;
+    float2 uv  : TEXCOORD;
 };
 
-void main(in uint VertId : SV_VertexID, out VSOutput VSOut) {
-    float4 Pos[6] = {
-        float4(-1.0, -1.0, 0.0, 1.0), float4(+1.0, +1.0, 0.0, 1.0), float4(+1.0, -1.0, 0.0, 1.0),
-        float4(-1.0, -1.0, 0.0, 1.0), float4(-1.0, +1.0, 0.0, 1.0), float4(+1.0, +1.0, 0.0, 1.0),
-    };
-
-    float2 UVs[6] = {
-        float2(0.0, 1.0), float2(1.0, 0.0), float2(1.0, 1.0),
-        float2(0.0, 1.0), float2(0.0, 0.0), float2(1.0, 0.0)
-    };
-
-    VSOut.Pos = Pos[VertId];
-    VSOut.UV  = UVs[VertId];
+VSOutput main(uint VertexID : SV_VertexID)
+{
+    VSOutput o;
+    o.uv = float2((VertexID << 1) & 2, VertexID & 2);
+    o.pos = float4(o.uv * 2.0f - 1.0f, 0.0f, 1.0f);
+    return o;
 }
