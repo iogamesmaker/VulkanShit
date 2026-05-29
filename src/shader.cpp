@@ -4,9 +4,8 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-#include <cstring>
 
-ShaderManager::ShaderManager(IRenderDevice* Device, const std::string& vertexPath, const std::string& fragmentPath) {
+ShaderManager::ShaderManager(IRenderDevice* pDevice, const std::string& vertexPath, const std::string& fragmentPath) {
     std::filesystem::path path = root_dir() / vertexPath;
 
     std::string source = ReadFile(path.string());
@@ -21,7 +20,7 @@ ShaderManager::ShaderManager(IRenderDevice* Device, const std::string& vertexPat
     std::string debugName = "vertex shader at " + path.string();
     ShaderCI.Desc.Name = debugName.c_str();
 
-    Device->CreateShader(ShaderCI, &vertexShader); // let the GPU compile the shader
+    pDevice->CreateShader(ShaderCI, &vertexShader); // let the GPU compile the shader
 
     if(fragmentPath != "") {
         path = root_dir() / fragmentPath;
@@ -32,7 +31,7 @@ ShaderManager::ShaderManager(IRenderDevice* Device, const std::string& vertexPat
 
         debugName = "pixel shader at " + path.string();
         ShaderCI.Desc.Name = debugName.c_str();
-        Device->CreateShader(ShaderCI, &fragmentShader);
+        pDevice->CreateShader(ShaderCI, &fragmentShader);
     }
 }
 
