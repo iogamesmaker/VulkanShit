@@ -23,6 +23,7 @@ add_compile_definitions(VULKAN_SUPPORTED=1)
 set(SOURCE
     src/main.cpp
     src/shader.cpp
+    src/world.cpp
 )
 add_subdirectory(DiligentCore)
 add_executable(diligent ${SOURCE})
@@ -31,8 +32,6 @@ set_target_properties(diligent PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(XCB REQUIRED xcb)
 
 target_include_directories(diligent PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore"

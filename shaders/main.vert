@@ -1,10 +1,19 @@
-struct PSInput {
+struct VSOutput {
     float4 Pos   : SV_POSITION;
-    float3 Color : COLOR;
+    float2 UV    : TEXCOORD0;
 };
-void main(in uint VertId : SV_VertexID, out PSInput PSIn) {
-    float4 Pos[3] = { float4(-0.5, -0.5, 0.0, 1.0), float4(0.0, +0.5, 0.0, 1.0), float4(+0.5, -0.5, 0.0, 1.0) };
-    float3 Col[3] = { float3(1.0, 0.0, 0.0), float3(0.0, 1.0, 0.0), float3(0.0, 0.0, 1.0) };
-    PSIn.Pos   = Pos[VertId];
-    PSIn.Color = Col[VertId];
+
+void main(in uint VertId : SV_VertexID, out VSOutput VSOut) {
+    float4 Pos[6] = {
+        float4(-1.0, -1.0, 0.0, 1.0), float4(+1.0, +1.0, 0.0, 1.0), float4(+1.0, -1.0, 0.0, 1.0),
+        float4(-1.0, -1.0, 0.0, 1.0), float4(-1.0, +1.0, 0.0, 1.0), float4(+1.0, +1.0, 0.0, 1.0),
+    };
+
+    float2 UVs[6] = {
+        float2(0.0, 1.0), float2(1.0, 0.0), float2(1.0, 1.0),
+        float2(0.0, 1.0), float2(0.0, 0.0), float2(1.0, 0.0)
+    };
+
+    VSOut.Pos = Pos[VertId];
+    VSOut.UV  = UVs[VertId];
 }
