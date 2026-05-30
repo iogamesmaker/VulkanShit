@@ -9,7 +9,7 @@
 #include <Graphics/GraphicsEngine/interface/TextureView.h>
 #include <Graphics/GraphicsEngine/interface/Buffer.h>
 #include <Graphics/GraphicsEngine/interface/Sampler.h>
-#include "Graphics/GraphicsEngine/interface/DeviceContext.h"
+#include <Graphics/GraphicsEngine/interface/DeviceContext.h>
 #include <Common/interface/RefCntAutoPtr.hpp>
 
 using namespace Diligent;

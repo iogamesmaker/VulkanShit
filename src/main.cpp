@@ -15,9 +15,9 @@
 #include "shader.hpp"
 #include "camera.hpp"
 
-#include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
-#include "Graphics/GraphicsEngine/interface/SwapChain.h"
-#include "Common/interface/BasicMath.hpp"
+#include <Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h>
+#include <Graphics/GraphicsEngine/interface/SwapChain.h>
+#include <Common/interface/BasicMath.hpp>
 
 struct ShaderData {
     float width;

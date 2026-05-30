@@ -1,6 +1,6 @@
 // camera.hpp
 #pragma once
-#include "Common/interface/BasicMath.hpp"
+#include <Common/interface/BasicMath.hpp>
 #include <cmath>
 #include <SDL3/SDL.h>
 
