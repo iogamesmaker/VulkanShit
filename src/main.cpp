@@ -7,16 +7,29 @@
 #define PLATFORM_LINUX 1
 #endif
 
-
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <cstring>
 #include <SDL3/SDL.h>
 #include "shader.hpp"
+#include "camera.hpp"
 
 #include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
 #include "Graphics/GraphicsEngine/interface/SwapChain.h"
+#include "Common/interface/BasicMath.hpp"
+
+struct ShaderData {
+    float width;
+    float height;
+    float padding2[2];
+
+    float4x4 viewmat;
+    float3 campos;
+
+    float padding[41];
+};
+
 
 using namespace Diligent;
 
@@ -24,10 +37,14 @@ class Application
 {
 public:
     Application(uint16_t width = 1024, uint16_t height = 768)
-    : m_Width(width), m_Height(height)
+    : m_Width(width), m_Height(height), m_camera(float3(0,0,-3))
     {
         InitWindow();
         InitSwapchain();
+
+        shaderdata.width  = static_cast<float>(m_Width);
+        shaderdata.height = static_cast<float>(m_Height);
+        shaderdata.campos = {0.0, 0.0, -3.0};
 
         CreatePipelines();
     }
@@ -44,8 +61,15 @@ public:
         bool quit = false;
         SDL_Event event;
 
+        SDL_SetWindowRelativeMouseMode(window, true);
+        Uint64 lastTime = SDL_GetTicks();
+
         while (!quit)
         {
+            Uint64 now = SDL_GetTicks();
+            float deltatime = (now - lastTime) / 1000.0f;
+            lastTime = now;
+
             while (SDL_PollEvent(&event))
             {
                 if (event.type == SDL_EVENT_QUIT)
@@ -54,7 +78,16 @@ public:
                 }
                 else if (event.type == SDL_EVENT_KEY_DOWN)
                 {
-                    if (event.key.key == SDLK_ESCAPE) quit = true;
+                    if (event.key.key == SDLK_ESCAPE){
+                        m_mouselocked = !m_mouselocked;
+
+                        SDL_SetWindowRelativeMouseMode(window, m_mouselocked);
+                    } else
+                    if (event.key.key == SDLK_F11) {
+                        m_fullscreen = !m_fullscreen;
+                        SDL_SetWindowFullscreen(window, m_fullscreen);
+                    } else
+                    if (event.key.key == SDLK_F5) {CreatePipelines();}
                 }
                 else if (event.type == SDL_EVENT_WINDOW_RESIZED)
                 {
@@ -73,10 +106,20 @@ public:
                         if (m_Width > 0 && m_Height > 0 && m_pSwapChain)
                         {
                             m_pSwapChain->Resize(m_Width, m_Height);
+                            shaderdata.width = static_cast<float>(m_Width);
+                            shaderdata.height = static_cast<float>(m_Height);
                         }
                     }
                 }
+                else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                    if(m_mouselocked) m_camera.processMouse(event.motion.xrel, event.motion.yrel);
+                }
             }
+            const bool* keystate = SDL_GetKeyboardState(nullptr);
+            m_camera.processKeys(keystate, deltatime);
+
+            shaderdata.viewmat = m_camera.getViewMat();
+            shaderdata.campos  = m_camera.pos();
 
             uint32_t flags = SDL_GetWindowFlags(window);
             bool isMinimized = (flags & SDL_WINDOW_MINIMIZED);
@@ -152,15 +195,21 @@ private:
         m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         m_pImmediateContext->ClearDepthStencil(pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-        m_pPipeline->draw(m_pImmediateContext);
+        m_pPipeline->updateConstants(m_pImmediateContext, &shaderdata, sizeof(shaderdata));
 
+        m_pPipeline->draw(m_pImmediateContext);
         m_pSwapChain->Present();
     }
 
     uint16_t m_Width;
     uint16_t m_Height;
 
+    ShaderData shaderdata{};
+    Camera m_camera;
+
     SDL_Window* window = nullptr;
+    bool m_mouselocked = true;
+    bool m_fullscreen = false;
 
     std::unique_ptr<ShaderManager> m_pPipeline;
 

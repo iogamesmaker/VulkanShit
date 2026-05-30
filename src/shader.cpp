@@ -59,6 +59,13 @@ void ShaderManager::createPipeline() {
     GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_NONE;
     GraphicsPipeline.DepthStencilDesc.DepthEnable = False;
 
+    ShaderResourceVariableDesc Vars[] =
+    {
+        {SHADER_TYPE_PIXEL, "Constants", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE}
+    };
+    PSOCI.PSODesc.ResourceLayout.Variables    = Vars;
+    PSOCI.PSODesc.ResourceLayout.NumVariables = _countof(Vars);
+
     m_pDevice->CreateGraphicsPipelineState(PSOCI, &m_pPSO);
     if(!m_pPSO) throw std::runtime_error("graphics pipeline couldn't be created");
 
