@@ -37,7 +37,7 @@ public:
     }
 
     float4x4 getViewMat() const {
-        float3 forward = getForward();
+        float3 forward = getForward(true);
         float3 right = normalize(cross(forward,float3(0,1,0)));
         float3 up = cross(right, forward);
 
@@ -53,14 +53,22 @@ public:
     float3 pos() {return m_position;}
 
 private:
-    float3 getForward() const {
+    float3 getForward(bool straight = false) const {
         float yawRad = m_yaw * (M_PI / 180.0f);
         float pitchRad = m_pitch * (M_PI / 180.0f);
-        return float3(
-            cos(pitchRad) * sin(yawRad),
-            -sin(pitchRad),
-            cos(pitchRad) * cos(yawRad)
-        );
+        if(!straight) {
+            return float3(
+                /*cos(pitchRad) * */sin(yawRad),
+                /*-sin(pitchRad)*/0.0f,
+                /*cos(pitchRad) **/ cos(yawRad)
+            );
+        } else {
+            return float3(
+                cos(pitchRad) * sin(yawRad),
+                -sin(pitchRad),
+                cos(pitchRad) * cos(yawRad)
+            );
+        }
     }
 
     float3 m_position;

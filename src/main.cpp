@@ -14,6 +14,7 @@
 #include <SDL3/SDL.h>
 #include "shader.hpp"
 #include "camera.hpp"
+#include "imguishit.hpp"
 
 #include <Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h>
 #include <Graphics/GraphicsEngine/interface/SwapChain.h>
@@ -26,8 +27,11 @@ struct ShaderData {
 
     float4x4 viewmat;
     float3 campos;
-
-    float padding[41];
+    float time;
+    float speed = 3.0;
+    int steps = 9;
+    float size = 0.3;
+    float padding[37];
 };
 
 
@@ -47,6 +51,7 @@ public:
         shaderdata.campos = {0.0, 0.0, -3.0};
 
         CreatePipelines();
+        imgui = std::make_unique<GUIHandler>(window, m_pDevice, m_pSwapChain->GetDesc().ColorBufferFormat, m_pSwapChain->GetDesc().DepthBufferFormat);
     }
 
     ~Application()
@@ -72,12 +77,16 @@ public:
 
             while (SDL_PollEvent(&event))
             {
+                imgui->process(&event);
                 if (event.type == SDL_EVENT_QUIT)
                 {
                     quit = true;
                 }
                 else if (event.type == SDL_EVENT_KEY_DOWN)
                 {
+                    if (event.key.key == SDLK_LALT) {
+                        m_gui = !m_gui;
+                    }
                     if (event.key.key == SDLK_ESCAPE){
                         m_mouselocked = !m_mouselocked;
 
@@ -135,14 +144,14 @@ private:
     void InitWindow()
     {
         #if defined(PLATFORM_LINUX)
-        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11");
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11"); // wayland does NOT play nice, x11 works on most wayland systems too
         #endif
 
         if (!SDL_Init(SDL_INIT_VIDEO)) {
             throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
         }
 
-        window = SDL_CreateWindow("Tutorial00: Hello Cross-Platform (Vulkan)",
+        window = SDL_CreateWindow("likjghf",
                                   m_Width, m_Height,
                                   SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (!window) {
@@ -195,9 +204,25 @@ private:
         m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         m_pImmediateContext->ClearDepthStencil(pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
+        shaderdata.time = SDL_GetTicks() * 0.001f;
+
         m_pPipeline->updateConstants(m_pImmediateContext, &shaderdata, sizeof(shaderdata));
 
         m_pPipeline->draw(m_pImmediateContext);
+
+        if(m_gui) {
+            imgui->begin(m_Width, m_Height, m_pSwapChain->GetDesc().PreTransform);
+
+            ImGui::Begin("Shader configuration");
+
+            // ImGui::SliderFloat("Black hole size", &shaderdata.size, 0.0f, 10.0f);
+            ImGui::SliderInt("Acreation disk steps", &shaderdata.steps, 0, 9);
+            ImGui::SliderFloat("Black hole speed", &shaderdata.speed, 0.0f, 10.0f);
+
+
+            ImGui::End();
+            imgui->end(m_pImmediateContext);
+        }
         m_pSwapChain->Present();
     }
 
@@ -210,7 +235,9 @@ private:
     SDL_Window* window = nullptr;
     bool m_mouselocked = true;
     bool m_fullscreen = false;
+    bool m_gui = false;
 
+    std::unique_ptr<GUIHandler> imgui;
     std::unique_ptr<ShaderManager> m_pPipeline;
 
     RefCntAutoPtr<IRenderDevice>  m_pDevice;
@@ -221,7 +248,7 @@ private:
 int main(int argc, char** argv)
 {
     try {
-        Application app(1024, 768);
+        Application app(800, 600);
         app.Run();
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";

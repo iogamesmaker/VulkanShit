@@ -34,7 +34,7 @@ add_subdirectory(DiligentTools)
 set(SOURCE
     src/main.cpp
     src/shader.cpp
-    # src/world.cpp
+    DiligentTools/ThirdParty/imgui/backends/imgui_impl_sdl3.cpp
 )
 
 add_executable(diligent ${SOURCE})
@@ -49,7 +49,7 @@ target_include_directories(diligent PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore/Primitives"
     "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore/Common"
     "${CMAKE_CURRENT_SOURCE_DIR}/DiligentCore/Graphics"
-    "${CMAKE_CURRENT_SOURCE_DIR}/DiligentTools/Imgui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/DiligentTools"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
