@@ -6,7 +6,7 @@
 
 class Camera {
 public:
-    Camera(const float3& pos = {0,0,0}, float yaw = -90.0f, float pitch = 0.0f) : m_position(pos), m_yaw(yaw), m_pitch(pitch) {}
+    Camera(const float3& pos = {0,0.1,-3.0}, float yaw = 0.0f, float pitch = 0.0f) : m_position(pos), m_yaw(yaw), m_pitch(pitch) {}
 
     void processKeys(const bool* keystate, float deltatime) {
         float speed = m_speed * deltatime;
@@ -51,6 +51,12 @@ public:
     }
 
     float3 pos() {return m_position;}
+
+    void reset() {
+        m_position = {0.0,0.1,-3.0};
+        m_yaw = 0.0f;
+        m_pitch = 0.0f;
+    }
 
 private:
     float3 getForward(bool straight = false) const {

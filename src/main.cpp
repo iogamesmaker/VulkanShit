@@ -28,10 +28,14 @@ struct ShaderData {
     float4x4 viewmat;
     float3 campos;
     float time;
-    float speed = 3.0;
+    float speed = 1.5;
     int steps = 9;
     float size = 0.3;
-    float padding[37];
+    float acreationSize = 9.0;
+    float3 objectPos = float3(1.0, 1.0, 5.0);
+    float3 objectVel = float3(0.0);
+    float simSpeed = 0.1;
+    float padding[29];
 };
 
 
@@ -41,14 +45,14 @@ class Application
 {
 public:
     Application(uint16_t width = 1024, uint16_t height = 768)
-    : m_Width(width), m_Height(height), m_camera(float3(0,0,-3))
+    : m_Width(width), m_Height(height), m_camera(float3(0,0.1,-3))
     {
         InitWindow();
         InitSwapchain();
 
         shaderdata.width  = static_cast<float>(m_Width);
         shaderdata.height = static_cast<float>(m_Height);
-        shaderdata.campos = {0.0, 0.0, -3.0};
+        shaderdata.campos = {0.0, 0.3, -3.0};
 
         CreatePipelines();
         imgui = std::make_unique<GUIHandler>(window, m_pDevice, m_pSwapChain->GetDesc().ColorBufferFormat, m_pSwapChain->GetDesc().DepthBufferFormat);
@@ -84,11 +88,13 @@ public:
                 }
                 else if (event.type == SDL_EVENT_KEY_DOWN)
                 {
-                    if (event.key.key == SDLK_LALT) {
+                    if (event.key.key == SDLK_LALT && !m_mouselocked) {
                         m_gui = !m_gui;
                     }
                     if (event.key.key == SDLK_ESCAPE){
                         m_mouselocked = !m_mouselocked;
+
+                        if(m_mouselocked) m_gui = false;
 
                         SDL_SetWindowRelativeMouseMode(window, m_mouselocked);
                     } else
@@ -129,6 +135,56 @@ public:
 
             shaderdata.viewmat = m_camera.getViewMat();
             shaderdata.campos  = m_camera.pos();
+            if(!m_paused) {
+                float3 pos = shaderdata.objectPos;
+                float3 vel = shaderdata.objectVel;
+
+                float distSq = pos.x * pos.x + pos.y * pos.y + pos.z * pos.z;
+                float dist = std::sqrt(distSq);
+
+                if (dist > 0.001f) {
+                    float GM = shaderdata.size * 15.0f;
+                    float gravityForce = GM / distSq;
+
+                    float3 dir(-pos.x / dist, -pos.y / dist, -pos.z / dist);
+
+                    float3 accel;
+                    accel.x = dir.x * gravityForce;
+                    accel.y = dir.y * gravityForce;
+                    accel.z = dir.z * gravityForce;
+
+                    float3 up(0.0f, 1.0f, 0.0f);
+
+                    float3 tangent(
+                        up.y * dir.z - up.z * dir.y,
+                        up.z * dir.x - up.x * dir.z,
+                        up.x * dir.y - up.y * dir.x
+                    );
+
+                    float frameDragStrength = shaderdata.speed * shaderdata.size * 8.0f;
+                    float dragForce = frameDragStrength / (distSq * dist);
+
+                    accel.x += tangent.x * dragForce;
+                    accel.y += tangent.y * dragForce;
+                    accel.z += tangent.z * dragForce;
+
+                    vel.x += accel.x * deltatime * shaderdata.simSpeed;
+                    vel.y += accel.y * deltatime * shaderdata.simSpeed;
+                    vel.z += accel.z * deltatime * shaderdata.simSpeed;
+
+                    pos.x += vel.x * deltatime * shaderdata.simSpeed;
+                    pos.y += vel.y * deltatime * shaderdata.simSpeed;
+                    pos.z += vel.z * deltatime * shaderdata.simSpeed;
+
+                    if (dist < shaderdata.size * 0.5f) {
+                        pos = float3(0.0f, 0.0f, 0.0f);
+                        vel = float3(0.0f, 0.0f, 0.0f);
+                    }
+
+                    shaderdata.objectPos = pos;
+                    shaderdata.objectVel = vel;
+                }
+            }
 
             uint32_t flags = SDL_GetWindowFlags(window);
             bool isMinimized = (flags & SDL_WINDOW_MINIMIZED);
@@ -210,15 +266,31 @@ private:
 
         m_pPipeline->draw(m_pImmediateContext);
 
-        if(m_gui) {
+        if(m_gui && !m_mouselocked) {
             imgui->begin(m_Width, m_Height, m_pSwapChain->GetDesc().PreTransform);
 
             ImGui::Begin("Shader configuration");
 
+            if(ImGui::Button("Reset Cam")) m_camera.reset();
+            std::string pauseButton = m_paused ? "Unpause" : "Pause";
+            if(ImGui::Button(pauseButton.c_str())) {
+                m_paused = !m_paused;
+            }
+
             // ImGui::SliderFloat("Black hole size", &shaderdata.size, 0.0f, 10.0f);
             ImGui::SliderInt("Acreation disk steps", &shaderdata.steps, 0, 9);
-            ImGui::SliderFloat("Black hole speed", &shaderdata.speed, 0.0f, 10.0f);
+            ImGui::SliderFloat("Acreation disk size", &shaderdata.acreationSize, 0.0f, 15.0f);
+            ImGui::SliderFloat("Black hole speed", &shaderdata.speed, -5.0f, 5.0f);
 
+            float pos3[3] = {shaderdata.objectPos.x, shaderdata.objectPos.y, shaderdata.objectPos.z};
+            if(ImGui::InputFloat3("Object position", pos3, "%.3f")) {
+                shaderdata.objectVel = float3(0.0f);
+                shaderdata.objectPos.x = pos3[0];
+                shaderdata.objectPos.y = pos3[1];
+                shaderdata.objectPos.z = pos3[2];
+            }
+
+            ImGui::InputFloat("Simulation speed", &shaderdata.simSpeed, 0.001f, 1.0f);
 
             ImGui::End();
             imgui->end(m_pImmediateContext);
@@ -230,11 +302,13 @@ private:
     uint16_t m_Height;
 
     ShaderData shaderdata{};
+
     Camera m_camera;
 
     SDL_Window* window = nullptr;
     bool m_mouselocked = true;
     bool m_fullscreen = false;
+    bool m_paused = false;
     bool m_gui = false;
 
     std::unique_ptr<GUIHandler> imgui;

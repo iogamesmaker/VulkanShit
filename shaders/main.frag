@@ -7,8 +7,16 @@ cbuffer Constants {
     float _Speed;
     int _Steps;
     float _Size;
-    float4 padington[9];
+    float acreationSize;
+    float3 objectPos;
+    float4 padington[8];
 };
+
+#define EPSILON 0.0001f
+#define NOHIT 0
+#define ACREATIONHIT 1
+#define HOLEHIT 2
+#define OBJECTHIT 3
 
 struct PSInput {
     float4 Pos   : SV_POSITION;
@@ -44,140 +52,65 @@ float3 generateStars(float3 rayDir) {
     return float3(smoothstep(0.995, 1.0, h));
 }
 
-float4 raymarchDisk(float3 ray, float3 zeroPos)
-{
-    float3 position = zeroPos;
-    float lengthPos = length(position.xz);
-    float dist = min(1.0, lengthPos * (1.0 / _Size) * 0.5) * _Size * 0.4 * (1.0 / _Steps) / (abs(ray.y));
 
-    position += dist * _Steps * ray * 0.5;
+float map(float3 p, out int hittype) {
+    hittype = NOHIT;
 
-    float2 deltaPos;
-    deltaPos.x = -zeroPos.z * 0.01 + zeroPos.x;
-    deltaPos.y = zeroPos.x * 0.01 + zeroPos.z;
-    deltaPos = normalize(deltaPos - zeroPos.xz);
-
-    float parallel = dot(ray.xz, deltaPos);
-    parallel /= sqrt(lengthPos);
-    parallel *= 0.5;
-    float redShift = parallel + 0.3;
-    redShift *= redShift;
-
-    redShift = clamp(redShift, 0.0, 1.0);
-
-    float disMix = clamp((lengthPos - _Size * 2.0) * (1.0 / _Size) * 0.24, 0.0, 1.0);
-    float3 insideCol = lerp(float3(1.0, 0.8, 0.0), float3(0.5, 0.13, 0.02) * 0.2, disMix);
-
-    insideCol *= lerp(float3(0.4, 0.2, 0.1), float3(1.6, 2.4, 4.0), redShift);
-    insideCol *= 1.25;
-    redShift += 0.12;
-    redShift *= redShift;
-
-    float4 o = float4(0.0, 0.0, 0.0, 0.0);
-
-    for(float i = 0.0 ; i < _Steps; i++)
-    {
-        position -= dist * ray;
-
-        float intensity = clamp(1.0 - abs((i - 0.8) * (1.0 / _Steps) * 2.0), 0.0, 1.0);
-        float lenSq = length(position.xz);
-        float distMult = 1.0;
-
-        distMult *= clamp((lenSq - _Size * 0.75) * (1.0 / _Size) * 1.5, 0.0, 1.0);
-        distMult *= clamp((_Size * 10.0 - lenSq) * (1.0 / _Size) * 0.20, 0.0, 1.0);
-        distMult *= distMult;
-
-        float u = lenSq + time * _Size * 0.3 + intensity * _Size * 0.2;
-
-        float2 xy;
-        float rot = fmod(time * _Speed, 8192.0);
-        xy.x = -position.z * sin(rot) + position.x * cos(rot);
-        xy.y = position.x * sin(rot) + position.z * cos(rot);
-
-        float x = abs(xy.x / xy.y);
-        float angle = 0.02 * atan(x);
-
-        const float f = 70.0;
-        float noise = value(float2(angle, u * (1.0 / _Size) * 0.05), f);
-        noise = noise * 0.66 + 0.33 * value(float2(angle, u * (1.0 / _Size) * 0.05), f * 2.0);
-
-        float extraWidth = noise * 1.0 * (1.0 - clamp(i * (1.0 / _Steps) * 2.0 - 1.0, 0.0, 1.0));
-        float alpha = clamp(noise * (intensity + extraWidth) * ((1.0 / _Size) * 10.0 + 0.01) * dist * distMult, 0.0, 1.0);
-
-        float3 col = 2.0 * lerp(float3(0.3, 0.2, 0.15) * insideCol, insideCol, min(1.0, intensity * 2.0));
-        o = clamp(float4(col * alpha + o.rgb * (1.0 - alpha), o.a * (1.0 - alpha) + alpha), float4(0.0, 0.0, 0.0, 0.0), float4(1.0, 1.0, 1.0, 1.0));
-
-        lenSq *= (1.0 / _Size);
-
-        o.rgb += redShift * (intensity * 1.0 + 0.5) * (1.0 / _Steps) * 100.0 * distMult / (lenSq * lenSq);
+    float distToHole = length(p);
+    if (distToHole < 2.0) {
+        hittype = HOLEHIT;
+        return distToHole - 2.0;
     }
 
-    o.rgb = clamp(o.rgb - 0.005, 0.0, 1.0);
-    return o;
+    if (abs(p.y) < (0.5 / _Steps) && length(p) < acreationSize) {
+        hittype = ACREATIONHIT;
+    }
+
+    return length(p) - 2.0;
+}
+
+float3 calcNormal(float3 p) {
+    int d;
+    float2 e = float2(1.0, -1.0) * 0.001;
+    return normalize(e.xyy * map(p + e.xyy, d) +
+    e.yyx * map(p + e.yyx, d) +
+    e.yxy * map(p + e.yxy, d) +
+    e.xxx * map(p + e.xxx, d));
 }
 
 float3 raytrace(float3 ro, float3 rd) {
-    float3 pos = ro;
-    float3 ray = rd;
+    float3 p = ro;
+    float3 v = rd;
+    float3 col = float3(0, 0, 0);
+    int hittype = NOHIT;
 
-    float4 col = float4(0.0, 0.0, 0.0, 0.0);
-    float4 glow = float4(0.0, 0.0, 0.0, 0.0);
-    float4 outCol = float4(100.0, 100.0, 100.0, 100.0);
+    for (int i = 0; i < _Steps; i++) {
+        float d = map(p, hittype);
 
-    for(int disks = 0; disks < 256; disks++)
-    {
-        for (int h = 0; h < 6; h++)
-        {
-            float dotpos = dot(pos, pos);
-            float invDist = rsqrt(dotpos);
-            float centDist = dotpos * invDist;
+        // Handle Hit
+        if (hittype == HOLEHIT) return float3(0, 0, 0); // Event horizon
 
-            float stepDist = min(dotpos * 0.2, max(length(pos) - _Size * 9.0, abs(pos.y / ray.y) * 0.9));
-            float farLimit = centDist * 0.5;
-            float closeLimit = centDist * 0.1 + 0.05 * centDist * centDist * (1.0 / _Size);
-            stepDist = min(stepDist, min(farLimit, closeLimit));
-
-            float invDistSqr = invDist * invDist;
-            float bendForce = stepDist * invDistSqr * _Size * 0.625;
-
-            float3 pos_cross_pole_axis = cross(float3(0.0, 1.0, 0.0), pos);
-
-            float sin2_colatitude = length(pos_cross_pole_axis) / max(length(pos), 0.0001);
-            sin2_colatitude = sin2_colatitude * sin2_colatitude;
-
-            float3 frameDragForce = normalize(pos_cross_pole_axis) * invDistSqr * sin2_colatitude * 0.012;
-
-            ray = normalize(ray - (bendForce * invDist) * pos);
-            pos += stepDist * (ray - frameDragForce);
-
-            glow += float4(1.2, 1.1, 1.0, 1.0) * (0.01 * stepDist * invDistSqr * invDistSqr * clamp(centDist * 2.0 - 1.2, 0.0, 1.0));
+        if (hittype == ACREATIONHIT) {
+            float brightness = 50.0 + 3.75 * (8.0 - pow(8.0 - d, 2.0) / 1.7);
+            col += float3(brightness / 31.875, (0.5 * brightness) / 31.875 / 1.8, 0) * 0.1;
         }
 
-        float dist2 = length(pos);
+        // Gravity update (The 3 lines from your code)
+        float distSq = dot(p, p);
+        float3 gravity = -p / (max(distSq, 0.1) * _Steps) * _Speed;
+        v = normalize(v + gravity);
 
-        if(dist2 < _Size * 0.5)
-        {
-            outCol = float4(col.rgb * col.a + glow.rgb * (1.0 - col.a), 1.0);
-            break;
-        }
-        else if(dist2 > _Size * 1000.0)
-        {
-            float3 bg = generateStars(ray);
-            outCol = float4(col.rgb * col.a + bg * (1.0 - col.a) + glow.rgb * (1.0 - col.a), 1.0);
-            break;
-        }
-        else if (abs(pos.y) <= _Size * 0.0005 && dist2 < _Size * 10.0)
-        {
-            float4 diskCol = raymarchDisk(ray, pos);
-            pos += abs(_Size * 0.001 / ray.y) * ray;
-            col = float4(diskCol.rgb * (1.0 - col.a) + col.rgb, col.a + diskCol.a * (1.0 - col.a));
-        }
+        // March
+        p += v * (1.0 / _Steps);
+
+        // Optimization: Exit if too far
+        if (length(p) > 200.0) break;
     }
 
-    if(outCol.r == 100.0)
-        outCol = float4(col.rgb + glow.rgb * (col.a + glow.a), 1.0);
+    // Add stars if we didn't hit anything
+    col += generateStars(rd);
 
-    return pow(max(outCol.rgb, 0.0), float3(0.6, 0.6, 0.6));
+    return col;
 }
 
 void main(in PSInput PSIn, out PSOutput PSOut)
